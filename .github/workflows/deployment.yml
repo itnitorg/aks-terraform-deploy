@@ -1,0 +1,215 @@
+name: "Deployment – App (Helm)"
+
+# ── Trigger ──────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches: [main]
+    paths:
+      - "charts/**"
+  workflow_dispatch: # Allow manual trigger
+
+# ── Global permissions for Azure OIDC ────────────────────────────────────────
+permissions:
+  id-token: write
+  contents: read
+
+# ── Shared variables ─────────────────────────────────────────────────────────
+env:
+  RESOURCE_GROUP_PREFIX: "terraform-aks"
+
+###############################################################################
+# JOBS
+###############################################################################
+jobs:
+
+  # ╔═══════════════════════════════════════════════════════════════════════════╗
+  # ║  Stage 1a: Package Chart                                                ║
+  # ╚═══════════════════════════════════════════════════════════════════════════╝
+  package:
+    name: "Package Chart"
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Upload Helm Charts
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-charts
+          path: charts/
+          retention-days: 5
+
+  # ╔═══════════════════════════════════════════════════════════════════════════╗
+  # ║  Stage 1b: Harden External Images                                       ║
+  # ╚═══════════════════════════════════════════════════════════════════════════╝
+  harden-images:
+    name: "Harden External Images"
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Discover ACR & Harden Images
+        run: |
+          # 1. Discover ACR Name
+          ACR_SERVER=$(az acr list \
+            --resource-group ${{ env.RESOURCE_GROUP_PREFIX }}-dev \
+            --query "[0].loginServer" -o tsv)
+
+          if [ -z "$ACR_SERVER" ]; then
+            echo "::error::No ACR found in resource group ${{ env.RESOURCE_GROUP_PREFIX }}-dev."
+            echo "Please ensure the Infrastructure Pipeline has provisioned the ACR (13-acr.tf)."
+            exit 1
+          fi
+
+          echo "Using ACR: $ACR_SERVER"
+
+          # 2. Login to Private ACR
+          az acr login --name "$ACR_SERVER"
+
+          # 3. List of images to harden
+          images=(
+            "stacksimplify/kube-nginxapp1:1.0.0"
+            "stacksimplify/kubenginx-usermgmt-webapp:1.0.0"
+            "mysql:5.6"
+            "stacksimplify/kubewindows-java-app1:v1.0.0"
+          )
+
+          for img in "${images[@]}"; do
+            echo "────────────────────────────────────────"
+            echo "Hardening $img..."
+            if docker pull "$img"; then
+              target_img="$ACR_SERVER/$img"
+              docker tag "$img" "$target_img"
+              docker push "$target_img"
+            else
+              echo "::warning::Failed to pull $img. Skipping..."
+            fi
+          done
+
+  # ╔═══════════════════════════════════════════════════════════════════════════╗
+  # ║  Stage 2: Deploy to Dev                                                 ║
+  # ╚═══════════════════════════════════════════════════════════════════════════╝
+  deploy-dev:
+    name: "Deploy to Dev"
+    needs: [package, harden-images]
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+
+      - name: Download Helm Charts
+        uses: actions/download-artifact@v4
+        with:
+          name: helm-charts
+          path: charts/
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install kubelogin
+        uses: azure/use-kubelogin@v1
+        with:
+          kubelogin-version: latest
+
+      - name: Get AKS Credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ env.RESOURCE_GROUP_PREFIX }}-dev \
+            --name ${{ env.RESOURCE_GROUP_PREFIX }}-dev-cluster \
+            --admin \
+            --overwrite-existing
+
+      - name: Fetch Infrastructure Info
+        id: infra
+        run: |
+          KV_NAME=$(az keyvault list \
+            --resource-group ${{ env.RESOURCE_GROUP_PREFIX }}-dev \
+            --query "[0].name" -o tsv)
+          TENANT_ID=$(az account show --query tenantId -o tsv)
+          ACR_SERVER=$(az acr list \
+            --resource-group ${{ env.RESOURCE_GROUP_PREFIX }}-dev \
+            --query "[0].loginServer" -o tsv)
+
+          echo "kv_name=$KV_NAME"       >> "$GITHUB_OUTPUT"
+          echo "tenant_id=$TENANT_ID"   >> "$GITHUB_OUTPUT"
+          echo "acr_server=$ACR_SERVER"  >> "$GITHUB_OUTPUT"
+
+      - name: Helm Upgrade – Dev
+        run: |
+          helm upgrade --install aks-stack-dev charts/aks-app-stack \
+            --values charts/aks-app-stack/values.yaml \
+            --set "global.registry=${{ steps.infra.outputs.acr_server }}" \
+            --set "keyVault.name=${{ steps.infra.outputs.kv_name }}" \
+            --set "global.tenantId=${{ steps.infra.outputs.tenant_id }}" \
+            --wait --timeout 5m
+
+  # ╔═══════════════════════════════════════════════════════════════════════════╗
+  # ║  Stage 3: Deploy to Prod                                                ║
+  # ╚═══════════════════════════════════════════════════════════════════════════╝
+  deploy-prod:
+    name: "Deploy to Prod"
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: prod   # Configure Required Reviewers in GitHub Settings
+    steps:
+
+      - name: Download Helm Charts
+        uses: actions/download-artifact@v4
+        with:
+          name: helm-charts
+          path: charts/
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install kubelogin
+        uses: azure/use-kubelogin@v1
+        with:
+          kubelogin-version: latest
+
+      - name: Get AKS Credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ env.RESOURCE_GROUP_PREFIX }}-prod \
+            --name ${{ env.RESOURCE_GROUP_PREFIX }}-prod-cluster \
+            --admin \
+            --overwrite-existing
+
+      - name: Fetch Infrastructure Info
+        id: infra
+        run: |
+          KV_NAME=$(az keyvault list \
+            --resource-group ${{ env.RESOURCE_GROUP_PREFIX }}-prod \
+            --query "[0].name" -o tsv)
+          TENANT_ID=$(az account show --query tenantId -o tsv)
+          # ACR is shared from dev resource group
+          ACR_SERVER=$(az acr list \
+            --resource-group ${{ env.RESOURCE_GROUP_PREFIX }}-dev \
+            --query "[0].loginServer" -o tsv)
+
+          echo "kv_name=$KV_NAME"       >> "$GITHUB_OUTPUT"
+          echo "tenant_id=$TENANT_ID"   >> "$GITHUB_OUTPUT"
+          echo "acr_server=$ACR_SERVER"  >> "$GITHUB_OUTPUT"
+
+      - name: Helm Upgrade – Prod
+        run: |
+          helm upgrade --install aks-stack-prod charts/aks-app-stack \
+            --values charts/aks-app-stack/values-prod.yaml \
+            --set "global.registry=${{ steps.infra.outputs.acr_server }}" \
+            --set "keyVault.name=${{ steps.infra.outputs.kv_name }}" \
+            --set "global.tenantId=${{ steps.infra.outputs.tenant_id }}" \
+            --wait --timeout 5m

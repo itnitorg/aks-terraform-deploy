@@ -1,0 +1,11 @@
+# Production-Specific Overrides
+global:
+  environment: prod
+
+apps:
+  nginx:
+    replicaCount: 3
+  java:
+    replicaCount: 2
+  dotnet:
+    replicaCount: 3

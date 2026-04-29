@@ -1,0 +1,115 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: usermngmt-db-config
+data:
+  DB_HOSTNAME: "mysql"
+  DB_PORT: "3306"
+  DB_NAME: "webappdb"
+  DB_USERNAME: "root"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: azure-disk-sc
+provisioner: kubernetes.io/azure-disk
+parameters:
+  skuname: Standard_LRS
+  kind: Managed
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pv-claim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: azure-disk-sc
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - image: {{ .Values.global.registry }}/{{ .Values.apps.java.mysql.repository }}:{{ .Values.apps.java.mysql.tag }}
+          name: mysql
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: {{ .Values.apps.java.mysql.password | quote }}
+          ports:
+            - containerPort: 3306
+              name: mysql
+          volumeMounts:
+            - name: mysql-persistent-storage
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql-persistent-storage
+          persistentVolumeClaim:
+            claimName: mysql-pv-claim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  ports:
+    - port: 3306
+  selector:
+    app: mysql
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: usermgmt-webapp
+spec:
+  replicas: {{ .Values.apps.java.replicaCount }}
+  selector:
+    matchLabels:
+      app: usermgmt-webapp
+  template:
+    metadata:
+      labels:
+        app: usermgmt-webapp
+    spec:
+      containers:
+        - name: usermgmt-webapp
+          image: {{ .Values.global.registry }}/{{ .Values.apps.java.repository }}:{{ .Values.apps.java.tag }}
+          envFrom:
+            - configMapRef:
+                name: usermngmt-db-config
+          env:
+            - name: DB_PASSWORD
+              value: {{ .Values.apps.java.mysql.password | quote }}
+          ports:
+            - containerPort: 8080
+      nodeSelector:
+        {{- toYaml .Values.nodeSelectors.linux | nindent 8 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: usermgmt-webapp-service
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 8080
+  selector:
+    app: usermgmt-webapp

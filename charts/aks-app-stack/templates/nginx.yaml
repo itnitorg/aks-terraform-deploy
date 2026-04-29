@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1-nginx-deployment
+  labels:
+    app: app1-nginx
+spec:
+  replicas: {{ .Values.apps.nginx.replicaCount }}
+  selector:
+    matchLabels:
+      app: app1-nginx
+  template:
+    metadata:
+      labels:
+        app: app1-nginx
+    spec:
+      containers:
+        - name: app1-nginx
+          image: {{ .Values.global.registry }}/{{ .Values.apps.nginx.repository }}:{{ .Values.apps.nginx.tag }}
+          ports:
+            - containerPort: 80
+      nodeSelector:
+        {{- toYaml .Values.nodeSelectors.linux | nindent 8 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app1-nginx-lb-service
+  labels:
+    app: app1-nginx
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: app1-nginx
