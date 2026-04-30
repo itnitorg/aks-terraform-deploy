@@ -55,12 +55,7 @@ jobs:
 
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
-        run: |
-          terraform init \
-            -backend-config="resource_group_name=${{ env.BACKEND_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ env.BACKEND_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ env.BACKEND_CONTAINER }}" \
-            -backend-config="key=aks-base.tfstate"
+        run: terraform init -backend=false
 
       - name: Terraform Validate
         working-directory: ${{ env.TF_WORKING_DIR }}
