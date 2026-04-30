@@ -14,6 +14,10 @@ spec:
       labels:
         app: app1-nginx
     spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: app1-nginx
           image: {{ .Values.global.registry }}/{{ .Values.apps.nginx.repository }}:{{ .Values.apps.nginx.tag }}

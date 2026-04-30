@@ -2,7 +2,9 @@
 global:
   environment: dev
   tenantId: "" # To be filled by pipeline
-  registry: docker.io # Default to public hub
+  registry: ghcr.io # Default to GHCR
+  imagePullSecrets:
+    - name: regcred
 
 keyVault:
   name: "" # To be filled by pipeline

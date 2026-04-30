@@ -14,6 +14,10 @@ spec:
       labels:
         app: windows-app
     spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: windows-app
           image: {{ .Values.global.registry }}/{{ .Values.apps.dotnet.repository }}:{{ .Values.apps.dotnet.tag }}

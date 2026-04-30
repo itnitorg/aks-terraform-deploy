@@ -12,6 +12,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  packages: write # Required for pushing to GHCR
 
 # ── Shared variables ─────────────────────────────────────────────────────────
 env:
@@ -55,25 +56,22 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Discover ACR & Harden Images
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Harden External Images
         run: |
-          # 1. Discover ACR Name
-          ACR_SERVER=$(az acr list \
-            --resource-group ${{ env.RESOURCE_GROUP_PREFIX }}-dev \
-            --query "[0].loginServer" -o tsv)
+          # 1. Define GHCR path (lowercase)
+          GHCR_SERVER="ghcr.io/${{ github.repository_owner }}"
+          GHCR_SERVER=$(echo "$GHCR_SERVER" | tr '[:upper:]' '[:lower:]')
 
-          if [ -z "$ACR_SERVER" ]; then
-            echo "::error::No ACR found in resource group ${{ env.RESOURCE_GROUP_PREFIX }}-dev."
-            echo "Please ensure the Infrastructure Pipeline has provisioned the ACR (13-acr.tf)."
-            exit 1
-          fi
+          echo "Using GHCR: $GHCR_SERVER"
 
-          echo "Using ACR: $ACR_SERVER"
-
-          # 2. Login to Private ACR
-          az acr login --name "$ACR_SERVER"
-
-          # 3. List of images to harden
+          # 2. List of images to harden
           images=(
             "stacksimplify/kube-nginxapp1:1.0.0"
             "stacksimplify/kubenginx-usermgmt-webapp:1.0.0"
@@ -85,7 +83,8 @@ jobs:
             echo "────────────────────────────────────────"
             echo "Hardening $img..."
             if docker pull "$img"; then
-              target_img="$ACR_SERVER/$img"
+              target_img="$GHCR_SERVER/$img"
+              target_img=$(echo "$target_img" | tr '[:upper:]' '[:lower:]')
               docker tag "$img" "$target_img"
               docker push "$target_img"
             else
@@ -136,19 +135,29 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP_PREFIX }}-dev \
             --query "[0].name" -o tsv)
           TENANT_ID=$(az account show --query tenantId -o tsv)
-          ACR_SERVER=$(az acr list \
-            --resource-group ${{ env.RESOURCE_GROUP_PREFIX }}-dev \
-            --query "[0].loginServer" -o tsv)
+          
+          # GHCR Path
+          GHCR_SERVER="ghcr.io/${{ github.repository_owner }}"
+          GHCR_SERVER=$(echo "$GHCR_SERVER" | tr '[:upper:]' '[:lower:]')
 
           echo "kv_name=$KV_NAME"       >> "$GITHUB_OUTPUT"
           echo "tenant_id=$TENANT_ID"   >> "$GITHUB_OUTPUT"
-          echo "acr_server=$ACR_SERVER"  >> "$GITHUB_OUTPUT"
+          echo "ghcr_server=$GHCR_SERVER"  >> "$GITHUB_OUTPUT"
+
+      - name: Create Image Pull Secret
+        run: |
+          # Create secret so AKS can pull from GHCR
+          kubectl create secret docker-registry regcred \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.GH_PACKAGE_TOKEN }} \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Helm Upgrade – Dev
         run: |
           helm upgrade --install aks-stack-dev charts/aks-app-stack \
             --values charts/aks-app-stack/values.yaml \
-            --set "global.registry=${{ steps.infra.outputs.acr_server }}" \
+            --set "global.registry=${{ steps.infra.outputs.ghcr_server }}" \
             --set "keyVault.name=${{ steps.infra.outputs.kv_name }}" \
             --set "global.tenantId=${{ steps.infra.outputs.tenant_id }}" \
             --wait --timeout 5m
@@ -196,20 +205,28 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP_PREFIX }}-prod \
             --query "[0].name" -o tsv)
           TENANT_ID=$(az account show --query tenantId -o tsv)
-          # ACR is shared from dev resource group
-          ACR_SERVER=$(az acr list \
-            --resource-group ${{ env.RESOURCE_GROUP_PREFIX }}-dev \
-            --query "[0].loginServer" -o tsv)
+          
+          # GHCR Path
+          GHCR_SERVER="ghcr.io/${{ github.repository_owner }}"
+          GHCR_SERVER=$(echo "$GHCR_SERVER" | tr '[:upper:]' '[:lower:]')
 
           echo "kv_name=$KV_NAME"       >> "$GITHUB_OUTPUT"
           echo "tenant_id=$TENANT_ID"   >> "$GITHUB_OUTPUT"
-          echo "acr_server=$ACR_SERVER"  >> "$GITHUB_OUTPUT"
+          echo "ghcr_server=$GHCR_SERVER"  >> "$GITHUB_OUTPUT"
+
+      - name: Create Image Pull Secret
+        run: |
+          kubectl create secret docker-registry regcred \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.GH_PACKAGE_TOKEN }} \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Helm Upgrade – Prod
         run: |
           helm upgrade --install aks-stack-prod charts/aks-app-stack \
             --values charts/aks-app-stack/values-prod.yaml \
-            --set "global.registry=${{ steps.infra.outputs.acr_server }}" \
+            --set "global.registry=${{ steps.infra.outputs.ghcr_server }}" \
             --set "keyVault.name=${{ steps.infra.outputs.kv_name }}" \
             --set "global.tenantId=${{ steps.infra.outputs.tenant_id }}" \
             --wait --timeout 5m

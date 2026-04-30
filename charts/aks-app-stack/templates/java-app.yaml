@@ -46,6 +46,10 @@ spec:
       labels:
         app: mysql
     spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - image: {{ .Values.global.registry }}/{{ .Values.apps.java.mysql.repository }}:{{ .Values.apps.java.mysql.tag }}
           name: mysql
@@ -88,6 +92,10 @@ spec:
       labels:
         app: usermgmt-webapp
     spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: usermgmt-webapp
           image: {{ .Values.global.registry }}/{{ .Values.apps.java.repository }}:{{ .Values.apps.java.tag }}
