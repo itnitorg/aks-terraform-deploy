@@ -119,7 +119,8 @@ jobs:
         uses: azure/use-kubelogin@v1
         with:
           kubelogin-version: latest
-          token: ${{ secrets.GH_PACKAGE_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get AKS Credentials
         run: |
@@ -190,7 +191,8 @@ jobs:
         uses: azure/use-kubelogin@v1
         with:
           kubelogin-version: latest
-          token: ${{ secrets.GH_PACKAGE_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get AKS Credentials
         run: |
