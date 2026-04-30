@@ -23,7 +23,12 @@ terraform {
     }
   }
 
-  backend "azurerm" {}
+  backend "azurerm" {
+    resource_group_name  = "terraform-storage-rg"
+    storage_account_name = "terraformstatexlrwdrza"
+    container_name       = "tfstatefiles"
+    key                  = "aks-base.tfstate"
+  }
 }
 
 provider "azurerm" {
