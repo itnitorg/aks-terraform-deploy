@@ -20,7 +20,7 @@ spec:
       {{- end }}
       containers:
         - name: windows-app
-          image: {{ .Values.global.registry }}/{{ .Values.apps.dotnet.repository }}:{{ .Values.apps.dotnet.tag }}
+          image: {{ .Values.apps.dotnet.registry | default .Values.global.registry }}/{{ .Values.apps.dotnet.repository }}:{{ .Values.apps.dotnet.tag }}
           ports:
             - containerPort: 80
       nodeSelector:

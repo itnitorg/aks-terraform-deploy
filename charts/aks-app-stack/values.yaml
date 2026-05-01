@@ -24,7 +24,8 @@ apps:
       password: "dbpassword11"
   dotnet:
     replicaCount: 1
-    repository: samples
+    registry: mcr.microsoft.com
+    repository: dotnet/framework/samples
     tag: aspnetapp
 
 nodeSelectors:
