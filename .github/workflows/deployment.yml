@@ -83,7 +83,9 @@ jobs:
             echo "────────────────────────────────────────"
             echo "Hardening $img..."
             if docker pull "$img"; then
-              target_img="$GHCR_SERVER/$img"
+              # Flatten name: strip prefix like 'stacksimplify/'
+              base_name=$(basename "$img")
+              target_img="$GHCR_SERVER/$base_name"
               target_img=$(echo "$target_img" | tr '[:upper:]' '[:lower:]')
               docker tag "$img" "$target_img"
               docker push "$target_img"

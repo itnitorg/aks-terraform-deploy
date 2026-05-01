@@ -12,11 +12,11 @@ keyVault:
 apps:
   nginx:
     replicaCount: 1
-    repository: stacksimplify/kube-nginxapp1
+    repository: kube-nginxapp1
     tag: 1.0.0
   java:
     replicaCount: 1
-    repository: stacksimplify/kubenginx-usermgmt-webapp
+    repository: kubenginx-usermgmt-webapp
     tag: 1.0.0
     mysql:
       repository: mysql
@@ -24,7 +24,7 @@ apps:
       password: "dbpassword11"
   dotnet:
     replicaCount: 1
-    repository: stacksimplify/kubewindows-java-app1
+    repository: kubewindows-java-app1
     tag: v1.0.0
 
 nodeSelectors:
