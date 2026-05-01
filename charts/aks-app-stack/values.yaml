@@ -16,16 +16,16 @@ apps:
     tag: 1.0.0
   java:
     replicaCount: 1
-    repository: kubenginx-usermgmt-webapp
-    tag: 1.0.0
+    repository: kube-usermgmt-webapp
+    tag: 1.0.0-MySQLDB
     mysql:
       repository: mysql
       tag: 5.6
       password: "dbpassword11"
   dotnet:
     replicaCount: 1
-    repository: kubewindows-java-app1
-    tag: v1.0.0
+    repository: samples
+    tag: aspnetapp
 
 nodeSelectors:
   linux:
