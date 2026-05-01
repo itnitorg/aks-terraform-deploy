@@ -11,8 +11,6 @@ resource "azurerm_key_vault" "keyvault" {
   purge_protection_enabled    = false
 
   sku_name = "standard"
-
-  sku_name = "standard"
 }
 
 # Access Policy for the Terraform User (The GitHub Robot)
