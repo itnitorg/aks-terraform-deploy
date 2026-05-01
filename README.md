@@ -1,5 +1,5 @@
 # AKS Multi-Environment Deployment with Terraform & GitHub Actions
-Test 2
+Test
 This repository provides a production-grade automation framework for provisioning Azure Kubernetes Service (AKS) clusters and deploying containerized applications using Terraform, Helm, and GitHub Actions.
 
 ## 🏗️ Project Structure
