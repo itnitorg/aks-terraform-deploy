@@ -40,4 +40,9 @@ resource "azurerm_key_vault_secret" "app_password" {
   name         = "app-db-password"
   value        = "P@ssw0rd123!"
   key_vault_id = azurerm_key_vault.keyvault.id
+
+  # Wait for the access policy to be fully applied before creating secrets
+  depends_on = [
+    azurerm_key_vault_access_policy.terraform_user
+  ]
 }
