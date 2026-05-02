@@ -16,9 +16,9 @@ This repository provides a production-grade automation framework for provisionin
 │   └── ...                  # ACR, KeyVault, Monitoring, IAM
 ├── charts/                  # Helm charts for application stack
 │   └── aks-app-stack/       # Unified application chart
-├── kustomize/               # Base
-│   └── base/                # overlays
-│   └── overlays/ 
+├── kustomize/               # Kustomize folder
+│   └── base/                # base
+│   └── overlays/            # overlays
 ├── manifests/               # Raw Kubernetes manifests (reference)
 └── README.md
 ```
