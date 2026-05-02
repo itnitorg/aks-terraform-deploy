@@ -159,6 +159,7 @@ jobs:
       - name: Deploy to AKS (Helm + Kustomize)
         run: |
           # 1. 'Bake' the Helm Chart into static YAML
+          mkdir -p kustomize/base
           helm template aks-stack-dev charts/aks-app-stack \
             --values charts/aks-app-stack/values.yaml \
             --set "global.registry=${{ steps.infra.outputs.ghcr_server }}" \
@@ -233,6 +234,7 @@ jobs:
       - name: Deploy to AKS (Helm + Kustomize)
         run: |
           # 1. 'Bake' the Helm Chart into static YAML
+          mkdir -p kustomize/base
           helm template aks-stack-prod charts/aks-app-stack \
             --values charts/aks-app-stack/values-prod.yaml \
             --set "global.registry=${{ steps.infra.outputs.ghcr_server }}" \
