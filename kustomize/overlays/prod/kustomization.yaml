@@ -1,9 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-commonLabels:
-  managed-by: gitops
-  environment: prod
+labels:
+  - pairs:
+      managed-by: gitops
+      environment: prod
+    includeSelectors: false
 
 commonAnnotations:
   enercity.de/logging-enabled: "true"
