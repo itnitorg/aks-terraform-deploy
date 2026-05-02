@@ -103,6 +103,9 @@ jobs:
     environment: dev
     steps:
 
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Download Helm Charts
         uses: actions/download-artifact@v4
         with:
@@ -178,6 +181,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod   # Configure Required Reviewers in GitHub Settings
     steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
       - name: Download Helm Charts
         uses: actions/download-artifact@v4
