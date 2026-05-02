@@ -4,8 +4,8 @@ global:
 
 apps:
   nginx:
-    replicaCount: 3
+    replicaCount: 1
   java:
-    replicaCount: 2
+    replicaCount: 1
   dotnet:
-    replicaCount: 3
+    replicaCount: 1
