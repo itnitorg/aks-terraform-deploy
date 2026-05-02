@@ -156,14 +156,17 @@ jobs:
             --docker-password=${{ secrets.GH_PACKAGE_TOKEN }} \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Helm Upgrade – Dev
+      - name: Deploy to AKS (Helm + Kustomize)
         run: |
-          helm upgrade --install aks-stack-dev charts/aks-app-stack \
+          # 1. 'Bake' the Helm Chart into static YAML
+          helm template aks-stack-dev charts/aks-app-stack \
             --values charts/aks-app-stack/values.yaml \
             --set "global.registry=${{ steps.infra.outputs.ghcr_server }}" \
             --set "keyVault.name=${{ steps.infra.outputs.kv_name }}" \
-            --set "global.tenantId=${{ steps.infra.outputs.tenant_id }}" \
-            --wait --timeout 5m
+            --set "global.tenantId=${{ steps.infra.outputs.tenant_id }}" > kustomize/base/all-resources.yaml
+
+          # 2. Apply the Kustomize Overlay (which adds labels/annotations/patches)
+          kubectl apply -k kustomize/overlays/dev
 
   # ╔═══════════════════════════════════════════════════════════════════════════╗
   # ║  Stage 3: Deploy to Prod                                                ║
@@ -227,11 +230,14 @@ jobs:
             --docker-password=${{ secrets.GH_PACKAGE_TOKEN }} \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Helm Upgrade – Prod
+      - name: Deploy to AKS (Helm + Kustomize)
         run: |
-          helm upgrade --install aks-stack-prod charts/aks-app-stack \
+          # 1. 'Bake' the Helm Chart into static YAML
+          helm template aks-stack-prod charts/aks-app-stack \
             --values charts/aks-app-stack/values-prod.yaml \
             --set "global.registry=${{ steps.infra.outputs.ghcr_server }}" \
             --set "keyVault.name=${{ steps.infra.outputs.kv_name }}" \
-            --set "global.tenantId=${{ steps.infra.outputs.tenant_id }}" \
-            --wait --timeout 5m
+            --set "global.tenantId=${{ steps.infra.outputs.tenant_id }}" > kustomize/base/all-resources.yaml
+
+          # 2. Apply the Kustomize Overlay (which adds labels/annotations/patches)
+          kubectl apply -k kustomize/overlays/prod

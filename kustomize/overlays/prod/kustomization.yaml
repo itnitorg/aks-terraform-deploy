@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+commonLabels:
+  managed-by: gitops
+  environment: prod
+
+commonAnnotations:
+  enercity.de/logging-enabled: "true"
+  enercity.de/team: "devsecops"
+  enercity.de/criticality: "high"
+
+# In Prod, we can force all images to have a specific pull policy
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+
+resources:
+  - ../../base
