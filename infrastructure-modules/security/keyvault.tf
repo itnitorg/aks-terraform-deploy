@@ -34,10 +34,16 @@ resource "time_sleep" "wait_for_policy" {
   create_duration = "30s"
 }
 
+resource "random_password" "db_password" {
+  length           = 16
+  special          = true
+  override_special = "_%@"
+}
+
 # Example Secret
 resource "azurerm_key_vault_secret" "app_password" {
   name         = "app-db-password"
-  value        = "P@ssw0rd123!"
+  value        = random_password.db_password.result
   key_vault_id = azurerm_key_vault.keyvault.id
 
   # Wait for the sleep to finish
