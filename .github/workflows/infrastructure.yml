@@ -103,7 +103,9 @@ jobs:
 
       - name: Terragrunt Apply
         working-directory: infrastructure-live/dev
-        run: terragrunt run-all apply --terragrunt-non-interactive -auto-approve
+        run: |
+          terragrunt run-all init
+          terragrunt run-all apply --terragrunt-non-interactive -auto-approve
 
   # ╔═══════════════════════════════════════════════════════════════════════════╗
   # ║  Stage 2b: Deploy Prod AKS Cluster                                      ║
@@ -145,4 +147,6 @@ jobs:
 
       - name: Terragrunt Apply
         working-directory: infrastructure-live/prod
-        run: terragrunt run-all apply --terragrunt-non-interactive -auto-approve
+        run: |
+          terragrunt run-all init
+          terragrunt run-all apply --terragrunt-non-interactive -auto-approve

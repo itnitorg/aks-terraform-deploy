@@ -28,14 +28,20 @@ resource "azurerm_key_vault_access_policy" "terraform_user" {
 
 # The AKS access policy has been moved to the AKS module to avoid circular dependencies.
 
+# Wait for the access policy to be fully applied before creating secrets
+resource "time_sleep" "wait_for_policy" {
+  depends_on = [azurerm_key_vault_access_policy.terraform_user]
+  create_duration = "30s"
+}
+
 # Example Secret
 resource "azurerm_key_vault_secret" "app_password" {
   name         = "app-db-password"
   value        = "P@ssw0rd123!"
   key_vault_id = azurerm_key_vault.keyvault.id
 
-  # Wait for the access policy to be fully applied before creating secrets
+  # Wait for the sleep to finish
   depends_on = [
-    azurerm_key_vault_access_policy.terraform_user
+    time_sleep.wait_for_policy
   ]
 }
