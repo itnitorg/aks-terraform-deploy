@@ -1,10 +1,12 @@
 # Create Azure Key Vault
 data "azurerm_client_config" "current" {}
 
+resource "random_pet" "aksrandom" {}
+
 resource "azurerm_key_vault" "keyvault" {
   name                        = "kv${var.environment}${replace(substr(random_pet.aksrandom.id, 0, 8), "-", "")}"
-  location                    = azurerm_resource_group.aks_rg.location
-  resource_group_name         = azurerm_resource_group.aks_rg.name
+  location                    = var.location
+  resource_group_name         = var.resource_group_name
   enabled_for_disk_encryption = true
   tenant_id                   = data.azurerm_client_config.current.tenant_id
   soft_delete_retention_days  = 7
@@ -24,16 +26,7 @@ resource "azurerm_key_vault_access_policy" "terraform_user" {
   ]
 }
 
-# Access Policy for AKS Key Vault Secrets Provider Identity
-resource "azurerm_key_vault_access_policy" "aks_identity" {
-  key_vault_id = azurerm_key_vault.keyvault.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_kubernetes_cluster.aks_cluster.key_vault_secrets_provider[0].secret_identity[0].object_id
-
-  secret_permissions = [
-    "Get", "List"
-  ]
-}
+# The AKS access policy has been moved to the AKS module to avoid circular dependencies.
 
 # Example Secret
 resource "azurerm_key_vault_secret" "app_password" {

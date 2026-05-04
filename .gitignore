@@ -1,4 +1,8 @@
-# ── Terraform ────────────────────────────────────────────────
+# ── Terragrunt & OpenTofu ──────────────────────────────────────
+.terragrunt-cache/
+terragrunt-debug.tfvars.json
+*.tofu
+tofu.tfstate*
 .terraform/
 *.tfstate
 *.tfstate.backup

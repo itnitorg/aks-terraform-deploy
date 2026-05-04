@@ -5,15 +5,12 @@
 
 # Resource Group Outputs
 output "location" {
-  value = azurerm_resource_group.aks_rg.location
+  value = var.location
 }
 
-output "resource_group_id" {
-  value = azurerm_resource_group.aks_rg.id
-}
-
+# Resource Group outputs removed (moved to networking)
 output "resource_group_name" {
-  value = azurerm_resource_group.aks_rg.name
+  value = var.resource_group_name
 }
 
 # Azure AKS Versions Datasource
@@ -26,12 +23,7 @@ output "latest_version" {
 }
 
 # Azure AD Group Object Id
-output "azure_ad_group_id" {
-  value = azuread_group.aks_administrators.id
-}
-output "azure_ad_group_objectid" {
-  value = azuread_group.aks_administrators.object_id
-}
+# Azure AD Group outputs removed (moved to security)
 
 
 # Azure AKS Outputs

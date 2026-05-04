@@ -23,16 +23,11 @@ terraform {
     }
   }
 
-  backend "azurerm" {
-    resource_group_name  = "terraform-storage-rg"
-    storage_account_name = "terraformstatexlrwdrza"
-    container_name       = "tfstatefiles"
-    key                  = "aks-base.tfstate"
-  }
+
 }
 
 provider "azurerm" {
-  subscription_id = "5c7c0a8a-cdd6-446e-991b-271d0cc0266e"
+  subscription_id = "233e9b38-166e-4095-862b-159ef9af59a7"
   features {
     resource_group {
       prevent_deletion_if_contains_resources = false

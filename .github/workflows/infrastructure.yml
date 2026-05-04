@@ -5,7 +5,8 @@ on:
   push:
     branches: [main]
     paths:
-      - "terraform/**"
+      - "infrastructure-modules/**"
+      - "infrastructure-live/**"
   workflow_dispatch: # Allow manual trigger
 
 # ── Global permissions for Azure OIDC ────────────────────────────────────────
@@ -15,15 +16,11 @@ permissions:
 
 # ── Environment variables shared across all jobs ─────────────────────────────
 env:
-  TF_WORKING_DIR: terraform
   ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
   ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   ARM_USE_OIDC: true
-  # Terraform Backend (Azure Storage)
-  BACKEND_RESOURCE_GROUP: "terraform-storage-rg"
-  BACKEND_STORAGE_ACCOUNT: "terraformstatexlrwdrza"
-  BACKEND_CONTAINER: "tfstatefiles"
+  TERRAGRUNT_VERSION: "0.68.7"
 
 ###############################################################################
 # JOBS
@@ -34,17 +31,24 @@ jobs:
   # ║  Stage 1: Validate                                                      ║
   # ╚═══════════════════════════════════════════════════════════════════════════╝
   validate:
-    name: "Terraform Validate"
+    name: "Terragrunt Validate"
     runs-on: ubuntu-latest
     steps:
 
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
         with:
-          terraform_wrapper: false
+          tofu_wrapper: false
+
+      - name: Setup Terragrunt
+        run: |
+          wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TERRAGRUNT_VERSION }}/terragrunt_linux_amd64
+          mv terragrunt_linux_amd64 terragrunt
+          chmod +x terragrunt
+          sudo mv terragrunt /usr/local/bin/
 
       - name: Azure Login (OIDC)
         uses: azure/login@v2
@@ -53,20 +57,11 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Terraform Init
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform init -backend=false
-
-      - name: Terraform Validate
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform validate
-
-      - name: Upload Terraform Manifests
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-out
-          path: ${{ env.TF_WORKING_DIR }}
-          retention-days: 5
+      - name: Terragrunt Init & Validate
+        working-directory: infrastructure-live/dev
+        run: |
+          terragrunt run-all init
+          terragrunt run-all validate
 
   # ╔═══════════════════════════════════════════════════════════════════════════╗
   # ║  Stage 2a: Deploy Dev AKS Cluster                                       ║
@@ -76,20 +71,22 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     environment: dev   # GitHub Environment – no approval required by default
-    env:
-      TF_VAR_environment: dev
     steps:
 
-      - name: Download Terraform
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-out
-          path: terraform-out
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
         with:
-          terraform_wrapper: false
+          tofu_wrapper: false
+
+      - name: Setup Terragrunt
+        run: |
+          wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TERRAGRUNT_VERSION }}/terragrunt_linux_amd64
+          mv terragrunt_linux_amd64 terragrunt
+          chmod +x terragrunt
+          sudo mv terragrunt /usr/local/bin/
 
       - name: Azure Login (OIDC)
         uses: azure/login@v2
@@ -100,29 +97,13 @@ jobs:
 
       - name: Write SSH Public Key
         run: |
-          echo "${{ secrets.SSH_PUBLIC_KEY }}" > /tmp/aks-ssh-key.pub
-          chmod 600 /tmp/aks-ssh-key.pub
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
+          chmod 600 ~/.ssh/id_rsa.pub
 
-      - name: Terraform Init
-        working-directory: terraform-out
-        run: |
-          terraform init \
-            -backend-config="resource_group_name=${{ env.BACKEND_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ env.BACKEND_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ env.BACKEND_CONTAINER }}" \
-            -backend-config="key=aks-dev.tfstate"
-
-      - name: Terraform Plan
-        working-directory: terraform-out
-        run: |
-          terraform plan \
-            -var "ssh_public_key=/tmp/aks-ssh-key.pub" \
-            -var "environment=dev" \
-            -out=dev-${{ github.run_id }}.tfplan
-
-      - name: Terraform Apply
-        working-directory: terraform-out
-        run: terraform apply -auto-approve dev-${{ github.run_id }}.tfplan
+      - name: Terragrunt Apply
+        working-directory: infrastructure-live/dev
+        run: terragrunt run-all apply --terragrunt-non-interactive -auto-approve
 
   # ╔═══════════════════════════════════════════════════════════════════════════╗
   # ║  Stage 2b: Deploy Prod AKS Cluster                                      ║
@@ -132,20 +113,22 @@ jobs:
     needs: deploy-dev
     runs-on: ubuntu-latest
     environment: prod   # GitHub Environment – configure Required Reviewers for manual approval
-    env:
-      TF_VAR_environment: prod
     steps:
 
-      - name: Download Terraform
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-out
-          path: terraform-out
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
         with:
-          terraform_wrapper: false
+          tofu_wrapper: false
+
+      - name: Setup Terragrunt
+        run: |
+          wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TERRAGRUNT_VERSION }}/terragrunt_linux_amd64
+          mv terragrunt_linux_amd64 terragrunt
+          chmod +x terragrunt
+          sudo mv terragrunt /usr/local/bin/
 
       - name: Azure Login (OIDC)
         uses: azure/login@v2
@@ -156,26 +139,10 @@ jobs:
 
       - name: Write SSH Public Key
         run: |
-          echo "${{ secrets.SSH_PUBLIC_KEY }}" > /tmp/aks-ssh-key.pub
-          chmod 600 /tmp/aks-ssh-key.pub
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
+          chmod 600 ~/.ssh/id_rsa.pub
 
-      - name: Terraform Init
-        working-directory: terraform-out
-        run: |
-          terraform init \
-            -backend-config="resource_group_name=${{ env.BACKEND_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ env.BACKEND_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ env.BACKEND_CONTAINER }}" \
-            -backend-config="key=aks-prod.tfstate"
-
-      - name: Terraform Plan
-        working-directory: terraform-out
-        run: |
-          terraform plan \
-            -var "ssh_public_key=/tmp/aks-ssh-key.pub" \
-            -var "environment=prod" \
-            -out=prod-${{ github.run_id }}.tfplan
-
-      - name: Terraform Apply
-        working-directory: terraform-out
-        run: terraform apply -auto-approve prod-${{ github.run_id }}.tfplan
+      - name: Terragrunt Apply
+        working-directory: infrastructure-live/prod
+        run: terragrunt run-all apply --terragrunt-non-interactive -auto-approve
