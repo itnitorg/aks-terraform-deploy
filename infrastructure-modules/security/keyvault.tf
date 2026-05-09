@@ -21,22 +21,12 @@ resource "azurerm_role_assignment" "terraform_secrets_officer" {
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
-# Access Policy for the Terraform User (The GitHub Robot)
-#resource "azurerm_key_vault_access_policy" "terraform_user" {
-#  key_vault_id = azurerm_key_vault.keyvault.id
-#  tenant_id    = data.azurerm_client_config.current.tenant_id
-#  object_id    = data.azurerm_client_config.current.object_id
-
-#  secret_permissions = [
-#    "Get", "List", "Set", "Delete", "Purge", "Recover"
-#  ]
-#}
 
 # The AKS access policy has been moved to the AKS module to avoid circular dependencies.
 
-# Wait for the access policy to be fully applied before creating secrets
+# Wait for the role assignment to be fully applied before creating secrets
 resource "time_sleep" "wait_for_policy" {
-  depends_on      = [azurerm_key_vault_access_policy.terraform_user]
+  depends_on      = [azurerm_role_assignment.terraform_secrets_officer]
   create_duration = "30s"
 }
 
