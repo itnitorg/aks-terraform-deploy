@@ -50,6 +50,14 @@ jobs:
           chmod +x terragrunt
           sudo mv terragrunt /usr/local/bin/
 
+      - name: Run Checkov Security Scan
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: terraform,github_actions
+          quiet: true
+          soft_fail: false
+
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
