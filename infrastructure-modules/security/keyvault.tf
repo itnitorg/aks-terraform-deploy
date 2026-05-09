@@ -1,5 +1,8 @@
 # Create Azure Key Vault
 data "azurerm_client_config" "current" {}
+data "azurerm_resource_group" "selected" {
+  name = var.resource_group_name
+}
 
 resource "random_pet" "aksrandom" {}
 
@@ -16,7 +19,7 @@ resource "azurerm_key_vault" "keyvault" {
   sku_name = "standard"
 }
 resource "azurerm_role_assignment" "terraform_secrets_officer" {
-  scope                = azurerm_key_vault.keyvault.id
+  scope                = data.azurerm_resource_group.selected.id
   role_definition_name = "Key Vault Secrets Officer"
   principal_id         = data.azurerm_client_config.current.object_id
 }
