@@ -18,18 +18,19 @@ resource "azurerm_key_vault" "keyvault" {
 
   sku_name = "standard"
 }
-resource "azurerm_role_assignment" "terraform_secrets_officer" {
-  scope                = data.azurerm_resource_group.selected.id
+
+# RBAC Role Assignment for Terraform/GitHub Actions Service Principal
+# Scope: Key Vault level (not resource group) for proper permission delegation
+resource "azurerm_role_assignment" "terraform_keyvault_secrets_officer" {
+  scope              = azurerm_key_vault.keyvault.id
   role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = data.azurerm_client_config.current.object_id
+  principal_id       = data.azurerm_client_config.current.object_id
 }
 
-
-# The AKS access policy has been moved to the AKS module to avoid circular dependencies.
-
 # Wait for the role assignment to be fully applied before creating secrets
+# This ensures the service principal has permissions when the secret resource is created
 resource "time_sleep" "wait_for_policy" {
-  depends_on      = [azurerm_role_assignment.terraform_secrets_officer]
+  depends_on      = [azurerm_role_assignment.terraform_keyvault_secrets_officer]
   create_duration = "30s"
 }
 
@@ -39,13 +40,13 @@ resource "random_password" "db_password" {
   override_special = "_%@"
 }
 
-# Example Secret
+# Application Database Password Secret
 resource "azurerm_key_vault_secret" "app_password" {
   name         = "app-db-password"
   value        = random_password.db_password.result
   key_vault_id = azurerm_key_vault.keyvault.id
 
-  # Wait for the sleep to finish
+  # Wait for the role assignment to be fully applied
   depends_on = [
     time_sleep.wait_for_policy
   ]
