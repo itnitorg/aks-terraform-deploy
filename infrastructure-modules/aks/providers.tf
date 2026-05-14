@@ -26,14 +26,7 @@ terraform {
 
 }
 
-provider "azurerm" {
-  subscription_id = "233e9b38-166e-4095-862b-159ef9af59a7"
-  features {
-    resource_group {
-      prevent_deletion_if_contains_resources = false
-    }
-  }
-}
+
 
 provider "helm" {
   kubernetes {
