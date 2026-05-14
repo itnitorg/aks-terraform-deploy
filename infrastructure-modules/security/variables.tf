@@ -42,7 +42,3 @@ variable "windows_admin_password" {
 }
 
 
-variable "aks_admin_group_id" {
-  type        = string
-  description = "The Object ID of the Azure AD Group for AKS Admins"
-}
