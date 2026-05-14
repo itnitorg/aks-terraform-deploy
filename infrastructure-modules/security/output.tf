@@ -9,6 +9,6 @@ output "keyvault_name" {
 }
 
 output "aks_admin_group_object_id" {
-  value       = azuread_group.aks_administrators.id
+  value       = azuread_group.aks_administrators.object_id
   description = "The Object ID of the Azure AD Group for AKS Admins"
 }
