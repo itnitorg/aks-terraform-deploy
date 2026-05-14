@@ -54,3 +54,15 @@ variable "aks_admin_group_id" {
   type        = string
   description = "The Object ID of the Azure AD Group for AKS Admins"
 }
+
+variable "github_repository" {
+  type        = string
+  description = "The URL of the GitHub repository to sync with Flux"
+  default     = "https://github.com/itnitorg/aks-terraform-deploy.git"
+}
+
+variable "github_token" {
+  type        = string
+  description = "GitHub Personal Access Token for Flux to access the repository"
+  sensitive   = true
+}
