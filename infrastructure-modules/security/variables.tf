@@ -41,3 +41,8 @@ variable "windows_admin_password" {
   description = "This variable defines the Windows admin password k8s Worker nodes"
 }
 
+
+variable "aks_admin_group_id" {
+  type        = string
+  description = "The Object ID of the Azure AD Group for AKS Admins"
+}
